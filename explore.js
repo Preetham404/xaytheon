@@ -1,223 +1,458 @@
-// Explore by Topic: Force-directed topic map with BFS expansion
-// Tokenless: Uses GitHub Search API for repos by base topic, optional language
-// Nodes: topic (blue) and repo (black). Edges connect repo -> topic.
-// Click a topic node to BFS-expand neighbors (discover more repos by that topic).
+// Explore by Topic — Graph + List View (FULLY WORKING)
 
-(function(){
-  const form = document.getElementById('explore-form');
-  if(!form) return;
+(function () {
+  const form = document.getElementById("explore-form");
+  if (!form) return;
 
-  const topicEl = document.getElementById('ex-base-topic');
-  const langEl = document.getElementById('ex-language');
-  const limitEl = document.getElementById('ex-limit');
-  const statusEl = document.getElementById('ex-status');
+  const topicEl = document.getElementById("ex-base-topic");
+  const langEl = document.getElementById("ex-language");
+  const limitEl = document.getElementById("ex-limit");
+  const statusEl = document.getElementById("ex-status");
+  const cacheInfoEl = document.getElementById("ex-cache-info");
 
-  const svg = d3.select('#graph');
+  // Debounce helper
+  function debounce(func, delay) {
+    let timeoutId;
+    return function(...args) {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+  }
+
+  // API call tracker for rate limiting
+  const API_TRACKER = {
+    lastCall: 0,
+    minInterval: 2000, // 2 seconds between calls to respect rate limits
+    
+    canCall() {
+      const now = Date.now();
+      return (now - this.lastCall) >= this.minInterval;
+    },
+    
+    recordCall() {
+      this.lastCall = Date.now();
+    }
+  };
+
+  const svg = d3.select("#graph");
   const width = () => svg.node().clientWidth;
   const height = () => svg.node().clientHeight;
 
-  let sim, linkSel, nodeSel; // d3 selections
-  const linkKeys = new Set(); // track unique edges
+  // View toggle
+  const graphView = document.getElementById("graph-view");
+  const listView = document.getElementById("list-view");
 
-  // Data structures
-  const nodes = new Map(); // id -> node { id, type: 'topic'|'repo', label }
-  const links = []; // { source, target }
+  //Active view button 
+  function setActive(btn) {
+    document.querySelectorAll(".view-toggle .btn")
+      .forEach(b => b.classList.remove("btn-primary"));
+    btn.classList.add("btn-primary");
+  }
 
-  function setStatus(msg, level='info'){
-    if(!statusEl) return;
+  document.getElementById("view-graph-btn")?.addEventListener("click", () => {
+    graphView.style.display = "block";
+    listView.style.display = "none";
+    setActive(document.getElementById("view-graph-btn"))
+  });
+
+  document.getElementById("view-list-btn")?.addEventListener("click", () => {
+    graphView.style.display = "none";
+    listView.style.display = "block";
+    setActive(document.getElementById("view-list-btn"))
+  });
+
+  // Graph state
+  let sim;
+  const nodes = new Map();
+  const links = [];
+  const linkKeys = new Set();
+
+  // Shared data
+  const exploreData = {
+    repos: []
+  };
+
+  // In-memory + local cache
+  const memoryCache = new Map(); // key -> { at:number, items:Array, expiresAt: number }
+  const TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+  function saveCache(key, value) {
+    const entry = { at: Date.now(), items: value, expiresAt: Date.now() + TTL_MS };
+    memoryCache.set(key, entry);
+    try { localStorage.setItem('xaytheon:explore:' + key, JSON.stringify(entry)); } catch {}
+    updateCacheInfo(key, entry);
+  }
+
+  function loadCache(key) {
+    const mem = memoryCache.get(key);
+    if (mem && Date.now() < mem.expiresAt) {
+      updateCacheInfo(key, mem);
+      return mem.items;
+    }
+    try {
+      const raw = localStorage.getItem('xaytheon:explore:' + key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && Date.now() < parsed.expiresAt) {
+        // Move to memory cache for faster access
+        memoryCache.set(key, parsed);
+        updateCacheInfo(key, parsed);
+        return parsed.items;
+      } else {
+        // Remove expired entry
+        localStorage.removeItem('xaytheon:explore:' + key);
+      }
+    } catch {}
+    return null;
+  }
+
+  function updateCacheInfo(key, entry) {
+    if (!cacheInfoEl) return;
+    if (entry) {
+      const age = Date.now() - entry.at;
+      const minutesOld = Math.floor(age / 60000);
+      const timeLeft = Math.max(0, Math.floor((entry.expiresAt - Date.now()) / 60000));
+      cacheInfoEl.innerHTML = `Cached ${minutesOld} min ago, expires in ${timeLeft} min <button id="clear-explore-cache" class="btn btn-sm" style="margin-left: 10px;">Clear Cache</button>`;
+      
+      // Add event listener for clear cache button
+      setTimeout(() => {
+        const clearBtn = document.getElementById('clear-explore-cache');
+        if (clearBtn) {
+          clearBtn.onclick = () => {
+            clearCache();
+            cacheInfoEl.innerHTML = 'Cache cleared';
+          };
+        }
+      }, 100);
+    }
+  }
+
+  function clearCache() {
+    memoryCache.clear();
+    try {
+      // Remove all explore cache entries
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('xaytheon:explore:')) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {}
+  }
+
+  function setStatus(msg, level = "info") {
     statusEl.textContent = msg;
-    statusEl.style.color = level==='error' ? '#b91c1c' : '#111827';
+    statusEl.style.color = level === "error" ? "#b91c1c" : "#111827";
   }
 
-  function nodeColor(d){
-    return d.type==='topic' ? '#0ea5e9' : '#111827';
+  function nodeColor(d) {
+    return d.type === "topic" ? "#0ea5e9" : "#111827";
   }
 
-  function addNode(id, data){
-    if(!nodes.has(id)) nodes.set(id, { id, ...data });
+  function addNode(id, data) {
+    if (!nodes.has(id)) nodes.set(id, { id, ...data });
     return nodes.get(id);
   }
 
-  function addLink(a, b){
+  function addLink(a, b) {
     const key = `${a}->${b}`;
     if (linkKeys.has(key)) return;
     linkKeys.add(key);
     links.push({ source: a, target: b });
   }
 
-  async function ghJson(url){
-    const res = await fetch(url, { headers: {
-      'Accept': 'application/vnd.github+json',
-      'User-Agent': 'XAYTHEON-Explore-Topic'
-    }});
-    if(!res.ok){
+  async function ghJson(url) {
+    const res = await fetch(url, {
+      headers: {
+        Accept: "application/vnd.github+json"
+      }
+    });
+    
+    // Check for rate limiting
+    if (res.status === 403 || res.status === 429) {
+      const resetTime = res.headers.get('X-RateLimit-Reset');
+      const remaining = res.headers.get('X-RateLimit-Remaining');
+      
+      if (remaining === '0' || res.status === 429) {
+        const resetDate = resetTime ? new Date(parseInt(resetTime) * 1000) : null;
+        const waitTime = resetDate ? Math.ceil((resetDate - Date.now()) / 60000) : 'unknown';
+        throw new Error(`⚠️ GitHub API rate limit exceeded. Please try again in ${waitTime} minutes.`);
+      }
+    }
+    
+    if (!res.ok) {
       const text = await res.text();
       throw new Error(`GitHub API ${res.status}: ${text}`);
     }
     return res.json();
   }
 
-  async function searchReposByTopic(topic, language, perPage){
+  async function searchReposByTopic(topic, language, limit) {
+    const cacheKey = JSON.stringify({ topic, language, limit });
+    
+    // Check cache first
+    const cached = loadCache(cacheKey);
+    if (cached) {
+      exploreData.repos.push(...cached);
+      return cached;
+    }
+    
     const parts = [`topic:${topic}`];
-    if(language) parts.push(`language:${language}`);
-    const q = encodeURIComponent(parts.join(' '));
-    const url = `https://api.github.com/search/repositories?q=${q}&sort=stars&order=desc&per_page=${Math.max(10, Math.min(100, perPage||50))}`;
+    if (language) parts.push(`language:${language}`);
+
+    const q = encodeURIComponent(parts.join(" "));
+    const url = `https://api.github.com/search/repositories?q=${q}&sort=stars&order=desc&per_page=${limit}`;
+
     const data = await ghJson(url);
-    return Array.isArray(data.items) ? data.items : [];
+    exploreData.repos.push(...data.items);
+    
+    // Cache the results
+    saveCache(cacheKey, data.items);
+    
+    return data.items;
   }
 
-  // Render/Update the force graph
-  function render(){
-    // Build arrays for d3
+  // ---------- LIST VIEW ----------
+  function renderRepoList(repos) {
+    const tbody = document.getElementById("repo-list");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+
+    repos.forEach(repo => {
+      const tr = document.createElement("tr");
+
+      const safeRepo = JSON.stringify({
+        full_name: repo.full_name,
+        language: repo.language,
+        html_url: repo.html_url
+      }).replace(/"/g, "&quot;");
+
+      tr.innerHTML = `
+        <td>
+          <a href="${repo.html_url}" target="_blank" rel="noopener" onclick='window.trackRepoView && window.trackRepoView(${safeRepo})'>
+            ${repo.full_name}
+          </a>
+        </td>
+        <td>${repo.topics?.[0] || "—"}</td>
+        <td>${repo.language || "—"}</td>
+        <td align="right">${repo.stargazers_count}</td>
+      `;
+
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ---------- GRAPH ----------
+  function renderGraph() {
+    svg.selectAll("*").remove();
+
+    const g = svg.append("g");
+    svg.call(d3.zoom().on("zoom", e => g.attr("transform", e.transform)));
+
     const nodeArr = Array.from(nodes.values());
 
-    // Clear svg
-    svg.selectAll('*').remove();
-
-    // Zoom/pan
-    const g = svg.append('g');
-    const zoom = d3.zoom().on('zoom', (ev)=>{ g.attr('transform', ev.transform); });
-    svg.call(zoom);
-
-    // Links
-    linkSel = g.append('g')
-      .attr('stroke', 'rgba(0,0,0,0.2)')
-      .attr('stroke-width', 1)
-      .selectAll('line')
+    const linkSel = g.append("g")
+      .attr("stroke", "rgba(0,0,0,0.25)")
+      .selectAll("line")
       .data(links)
       .enter()
-      .append('line');
+      .append("line");
 
-    // Nodes
-    nodeSel = g.append('g')
-      .selectAll('circle')
-      .data(nodeArr, d=>d.id)
+    const nodeSel = g.append("g")
+      .selectAll("circle")
+      .data(nodeArr, d => d.id)
       .enter()
-      .append('circle')
-      .attr('r', d=> d.type==='topic' ? 8 : 6)
-      .attr('fill', nodeColor)
-      .attr('stroke', '#fff')
-      .attr('stroke-width', 1)
-      .style('cursor', 'pointer')
-      .on('click', onNodeClick);
+      .append("circle")
+      .attr("r", d => (d.type === "topic" ? 8 : 6))
+      .attr("fill", nodeColor)
+      .attr("stroke", "#fff")
+      .style("cursor", "pointer")
+      .on("click", debouncedNodeClick);
 
-    // Titles
-    nodeSel.append('title').text(d=>{
-      if (d.type === 'repo') return `${d.label}\n${d.url||''}`;
-      return d.label || d.id;
-    });
+    nodeSel.append("title").text(d => d.label);
 
-    // Labels (lightweight)
-    const labelSel = g.append('g')
-      .selectAll('text')
-      .data(nodeArr, d=>d.id)
-      .enter()
-      .append('text')
-      .text(d=> d.type==='topic' ? d.label : '')
-      .attr('font-size', 10)
-      .attr('fill', '#333');
-
-    // Simulation (tuned for larger samples):
-    // - Slightly stronger repulsion for topic to keep spokes open
-    // - Collide radius scaled by node type
-    // - Gentle x/y centering to avoid drifting to edges
-    // - Reheat alpha when (re)rendering
     sim = d3.forceSimulation(nodeArr)
-      .force('charge', d3.forceManyBody().strength(d => d.type==='topic' ? -120 : -35))
-      .force('link', d3.forceLink(links).id(d=>d.id).distance(l => (l.source.type==='repo' && l.target.type==='topic') ? 70 : 60).strength(0.8))
-      .force('center', d3.forceCenter(width()/2, height()/2))
-      .force('x', d3.forceX(width()/2).strength(0.05))
-      .force('y', d3.forceY(height()/2).strength(0.05))
-      .force('collide', d3.forceCollide(d => d.type==='topic' ? 12 : 9))
-      .alpha(1)
-      .alphaDecay(0.06)
-      .on('tick', ()=>{
+      .force("charge", d3.forceManyBody().strength(d => d.type === "topic" ? -120 : -40))
+      .force("link", d3.forceLink(links).id(d => d.id).distance(70))
+      .force("center", d3.forceCenter(width() / 2, height() / 2))
+      .force("collide", d3.forceCollide(d => d.type === "topic" ? 14 : 10))
+      .on("tick", () => {
         linkSel
-          .attr('x1', d=>d.source.x)
-          .attr('y1', d=>d.source.y)
-          .attr('x2', d=>d.target.x)
-          .attr('y2', d=>d.target.y);
-        g.selectAll('circle')
-          .attr('cx', d=>d.x)
-          .attr('cy', d=>d.y);
-        labelSel
-          .attr('x', d=>d.x+8)
-          .attr('y', d=>d.y+4);
-      });
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
 
-    // Keep forces centered on resize
-    window.addEventListener('resize', () => {
-      if (!sim) return;
-      sim.force('center', d3.forceCenter(width()/2, height()/2));
-      sim.force('x', d3.forceX(width()/2).strength(0.05));
-      sim.force('y', d3.forceY(height()/2).strength(0.05));
-      sim.alpha(0.5).restart();
-    });
+        nodeSel
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y);
+      });
   }
 
-  async function onNodeClick(event, d){
-    if (d.type === 'repo') {
-      if (d.url) window.open(d.url, '_blank', 'noopener');
+  // Debounced node click function
+  const debouncedNodeClick = debounce(async function onNodeClick(event, d) {
+    if (d.type === "repo") {
+      if (window.trackRepoView) {
+        window.trackRepoView({ full_name: d.label, html_url: d.url });
+      }
+      window.open(d.url, "_blank");
       return;
     }
-    if (d.type !== 'topic') return;
-    // BFS-like expand: fetch repos for this topic and link them in
-    try{
-      setStatus(`Expanding topic ${d.label}…`);
-      const repos = await searchReposByTopic(d.label, langEl.value.trim(), 30);
-      let added = 0;
-      for (const r of repos){
-        const repoId = `repo:${r.full_name}`;
-        const topicId = `topic:${d.label}`;
-        addNode(repoId, { type:'repo', label:r.full_name, url: r.html_url });
-        addLink(repoId, topicId);
-        added++;
-      }
-      setStatus(added?`Added ${added} repos for ${d.label}.`:'No new repos for this topic.');
-      render();
-    } catch(e){
-      console.error(e);
-      setStatus(e.message || 'Failed to expand topic', 'error');
-    }
-  }
 
-  async function explore(){
+    // Rate limiting check
+    if (!API_TRACKER.canCall()) {
+      setStatus('Please wait a moment before expanding another topic.', 'error');
+      return;
+    }
+    
+    API_TRACKER.recordCall();
+    
+    try {
+      setStatus(`Expanding ${d.label}…`);
+      const repos = await searchReposByTopic(d.label, langEl.value.trim(), 30);
+
+      repos.forEach(r => {
+        const repoId = `repo:${r.full_name}`;
+        addNode(repoId, { type: "repo", label: r.full_name, url: r.html_url });
+        addLink(repoId, d.id);
+      });
+
+      renderGraph();
+      renderRepoList(exploreData.repos);
+      setStatus(`Added ${repos.length} repos`);
+    } catch (e) {
+      console.error(e);
+      setStatus(e.message || "Failed to expand topic", "error");
+      
+      // Add retry functionality
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'btn btn-sm';
+      retryBtn.textContent = 'Retry';
+      retryBtn.style.marginLeft = '10px';
+      retryBtn.onclick = () => {
+        onNodeClick(event, d);
+      };
+      
+      const statusContainer = statusEl;
+      statusContainer.appendChild(retryBtn);
+    }
+  }, 300); // 300ms debounce
+
+  // Debounced explore function
+  const debouncedExplore = debounce(async function explore() {
     nodes.clear();
     links.length = 0;
     linkKeys.clear();
-    const base = (topicEl.value||'').trim() || 'threejs';
-    const lang = (langEl.value||'').trim();
-    const limit = Math.max(10, Math.min(100, parseInt(limitEl.value||'50',10)));
+    exploreData.repos = [];
 
-    // Seed the base topic
-  addNode(`topic:${base}`, { type:'topic', label: base });
+    const base = topicEl.value.trim() || "threejs";
+    const lang = langEl.value.trim();
+    const limitValue = limitEl.value.trim();
 
-    try{
-      setStatus('Loading repositories…');
-      const repos = await searchReposByTopic(base, lang, limit);
-      let added = 0;
-      for (const r of repos){
-        const repoId = `repo:${r.full_name}`;
-        addNode(repoId, { type:'repo', label: r.full_name, url: r.html_url });
-        addLink(repoId, `topic:${base}`);
-        added++;
-      }
-      setStatus(`Loaded ${added} repos for topic ${base}. Click a topic node to expand.`);
-      render();
-    } catch(e){
-      console.error(e);
-      setStatus(e.message || 'Failed to load repositories', 'error');
+    // Validate topic
+    if (base.length > 50) {
+      setStatus("Topic must be 50 characters or less.", "error");
+      return;
     }
-  }
 
-  form.addEventListener('submit', (e)=>{ e.preventDefault(); explore(); });
-  document.getElementById('ex-clear').addEventListener('click', ()=>{
-    topicEl.value = 'threejs';
-    langEl.value = '';
-    limitEl.value = '50';
-    explore();
+    // Validate language
+    if (lang && lang.length > 20) {
+      setStatus("Language must be 20 characters or less.", "error");
+      return;
+    }
+
+    // Validate limit
+    const limitNum = Number(limitValue);
+    if (isNaN(limitNum) || limitNum < 10 || limitNum > 100) {
+      setStatus("Limit must be a number between 10 and 100.", "error");
+      return;
+    }
+
+    const limit = Math.min(100, Math.max(10, limitNum));
+
+    addNode(`topic:${base}`, { type: "topic", label: base });
+
+    // Disable form during loading
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Loading...';
+    }
+    
+    // Disable all form inputs
+    const inputs = form.querySelectorAll('input, select, button');
+    inputs.forEach(input => {
+      if (input !== submitBtn) input.disabled = true;
+    });
+
+    try {
+      // Rate limiting check
+      if (!API_TRACKER.canCall()) {
+        setStatus('Please wait a moment before making another request.', 'error');
+        return;
+      }
+      
+      API_TRACKER.recordCall();
+      
+      if (window.trackSearchInterest) {
+        window.trackSearchInterest(base, lang);
+      }
+      setStatus("Loading repositories…");
+      const repos = await searchReposByTopic(base, lang, limit);
+
+      repos.forEach(r => {
+        const repoId = `repo:${r.full_name}`;
+        addNode(repoId, { type: "repo", label: r.full_name, url: r.html_url });
+        addLink(repoId, `topic:${base}`);
+      });
+
+      renderGraph();
+      renderRepoList(exploreData.repos);
+      setStatus(`Loaded ${repos.length} repositories`);
+    } catch (e) {
+      console.error(e);
+      setStatus(e.message || "Failed to load data", "error");
+      
+      // Add retry functionality
+      const retryBtn = document.createElement('button');
+      retryBtn.className = 'btn btn-sm';
+      retryBtn.textContent = 'Retry';
+      retryBtn.style.marginLeft = '10px';
+      retryBtn.onclick = () => {
+        explore();
+      };
+      
+      const statusContainer = statusEl;
+      statusContainer.appendChild(retryBtn);
+    } finally {
+      // Re-enable form
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Explore';
+      }
+      inputs.forEach(input => {
+        if (input !== submitBtn) input.disabled = false;
+      });
+    }
+  }, 300); // 300ms debounce
+
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    debouncedExplore();
   });
 
-  // Initial
-  explore();
+  document.getElementById("ex-clear").addEventListener("click", () => {
+    topicEl.value = "threejs";
+    langEl.value = "";
+    limitEl.value = "50";
+    debouncedExplore();
+  });
+
+  // Replace the node click handler with debounced version
+  // Find the node selection code and replace the click handler
+  // We need to update the renderGraph function to use the debounced click handler
+  
+  // Initial load with defaults
+  debouncedExplore();
 })();

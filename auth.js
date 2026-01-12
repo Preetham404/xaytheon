@@ -1,149 +1,375 @@
-// Supabase Auth Integration (client-only)
-// Initializes Supabase, renders navbar auth UI, handles magic link redirects, and sign out.
+(function () {
+  const API_BASE_URL = window.location.protocol === "https:"
+    ? "https://your-api-domain.com/api/auth"
+    : "http://localhost:5000/api/auth";
 
-(function(){
-  const SUPABASE_URL = 'https://gqwohbqudbxahlssuohr.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdxd29oYnF1ZGJ4YWhsc3N1b2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1MDM0OTgsImV4cCI6MjA3NjA3OTQ5OH0.KLkjEHdMM5xUpO-bLRhLGYF_x6XShzjso4Evwlxza2I';
+  const REQUEST_TIMEOUT = 30000;
 
-  let client;
-  function ensureClient(){
-    if (!client) {
-      if (!window.supabase || !window.supabase.createClient) {
-        console.warn('Supabase SDK not loaded');
-        return null;
+  async function fetchWithTimeout(url, options = {}, timeout = REQUEST_TIMEOUT) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (err) {
+      clearTimeout(timeoutId);
+      if (err.name === 'AbortError') {
+        throw new Error('Request timeout. Please check your connection.');
       }
-      client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      throw err;
     }
-    return client;
   }
 
-  async function getSession(){
-    const c = ensureClient();
-    if (!c) return null;
-    const { data } = await c.auth.getSession();
-    return data?.session || null;
+  let accessToken = null;
+  let currentUser = null;
+  let tokenExpiryTime = null;
+  let refreshTimer = null;
+
+  function setAccessToken(token, expiresIn, user) {
+    accessToken = token;
+    if (user) currentUser = user;
+    tokenExpiryTime = Date.now() + (expiresIn - 60) * 1000;
+    scheduleTokenRefresh();
+    window.dispatchEvent(new CustomEvent('xaytheon:authchange', { detail: { user: currentUser } }));
   }
 
-  function computeRedirectTo(){
-    // Redirect back to index.html in the same repo path (works for GitHub Pages subpaths)
-    const { origin, pathname } = location;
-    const basePath = pathname.replace(/\/[^\/]*$/, '/');
-    return origin + basePath + 'index.html';
+  async function getSession() {
+    if (!accessToken) return null;
+    return {
+      access_token: accessToken,
+      user: currentUser
+    };
   }
 
-  function initialsAvatarData(text) {
-    const ch = (text||'?').trim().charAt(0).toUpperCase() || '?';
-    const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'>
-      <rect width='100%' height='100%' rx='8' ry='8' fill='#111'/>
-      <text x='50%' y='54%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='32' fill='#fff'>${ch}</text>
-    </svg>`;
-    return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  function clearAccessToken() {
+    accessToken = null;
+    currentUser = null;
+    tokenExpiryTime = null;
+    localStorage.removeItem("x_refresh_token"); // Clear persistence
+    if (refreshTimer) {
+      clearTimeout(refreshTimer);
+      refreshTimer = null;
+    }
+    window.dispatchEvent(new CustomEvent('xaytheon:authchange', { detail: { user: null } }));
   }
 
-  function getAvatarUrl(session){
-    const user = session?.user;
-    const meta = user?.user_metadata || {};
-    const email = user?.email || '';
-    return (
-      meta.avatar_url || meta.picture || initialsAvatarData(email)
-    );
+  function getAccessToken() {
+    return accessToken;
   }
 
-  async function renderAuthArea(){
-    const container = document.getElementById('auth-area');
+  function isTokenExpiringSoon() {
+    if (!tokenExpiryTime) return true;
+    return Date.now() >= tokenExpiryTime;
+  }
+
+  async function refreshAccessToken() {
+    try {
+      const storedRefreshToken = localStorage.getItem("x_refresh_token");
+      const isFileProtocol = window.location.protocol === 'file:';
+
+      const options = {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      };
+
+      if (storedRefreshToken) {
+        options.body = JSON.stringify({ refreshToken: storedRefreshToken });
+        // On file protocol, avoiding credentials helps avoid some CORS/cookie strictness
+        // On http/https, we can include them, but it's not strictly necessary if body has token
+      } else {
+        options.credentials = "include";
+      }
+
+      const res = await fetchWithTimeout(`${API_BASE_URL}/refresh`, options);
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || "Token refresh failed");
+      }
+
+      const data = await res.json();
+      setAccessToken(data.accessToken, data.expiresIn, data.user);
+
+      if (data.refreshToken) {
+        localStorage.setItem("x_refresh_token", data.refreshToken);
+      }
+
+      return true;
+    } catch (err) {
+      console.warn("Session restore failed:", err);
+      if (!err.message.includes("Network")) {
+        // If the token is definitely invalid (401 from backend), clear it.
+        // If it's a network error (server down), keep it to try again later.
+        if (err.message.includes("Invalid") || err.message.includes("expired") || err.message.includes("not found")) {
+          clearAccessToken();
+          renderAuthArea();
+          applyAuthGating();
+        }
+      }
+      return false;
+    }
+  }
+
+  function scheduleTokenRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+
+    if (!tokenExpiryTime) return;
+
+    const timeUntilRefresh = tokenExpiryTime - Date.now();
+    if (timeUntilRefresh > 0) {
+      refreshTimer = setTimeout(() => {
+        refreshAccessToken();
+      }, timeUntilRefresh);
+    }
+  }
+
+  async function authenticatedFetch(url, options = {}) {
+    if (isTokenExpiringSoon()) {
+      const refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        throw new Error("Authentication required");
+      }
+    }
+
+    const token = getAccessToken();
+    if (!token) {
+      throw new Error("No access token available");
+    }
+
+    const headers = {
+      ...options.headers,
+      "Authorization": `Bearer ${token}`,
+    };
+
+    const response = await fetchWithTimeout(url, {
+      ...options,
+      headers,
+      credentials: "include",
+    });
+
+    if (response.status === 401) {
+      const data = await response.json();
+      if (data.expired) {
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // Retry request with new token
+          headers.Authorization = `Bearer ${getAccessToken()}`;
+          return fetch(url, { ...options, headers, credentials: "include" });
+        }
+      }
+    }
+
+    return response;
+  }
+
+  function isAuthenticated() {
+    return accessToken !== null;
+  }
+
+  async function login(email, password) {
+    // Input validation
+    if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+      throw new Error('Email and password are required');
+    }
+
+    if (email.length > 254 || password.length > 128) {
+      throw new Error('Input data too long');
+    }
+
+    if (email.length < 3 || password.length < 8) {
+      throw new Error('Input data too short');
+    }
+
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      if (!res.ok) {
+        let errorMessage = "Login failed";
+        try {
+          const err = await res.json();
+          errorMessage = err.message || errorMessage;
+        } catch {
+          // If we can't parse the error response, use status text
+          errorMessage = res.statusText || errorMessage;
+        }
+
+        // Handle specific HTTP status codes
+        if (res.status === 429) {
+          throw new Error('Too many login attempts. Please wait before trying again.');
+        } else if (res.status === 401) {
+          throw new Error('Invalid email or password');
+        } else if (res.status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await res.json();
+
+      // Validate response data
+      if (!data.accessToken || !data.user) {
+        throw new Error('Invalid response from server');
+      }
+
+      setAccessToken(data.accessToken, data.expiresIn, data.user);
+
+      if (data.refreshToken) {
+        localStorage.setItem("x_refresh_token", data.refreshToken);
+      }
+
+      renderAuthArea();
+      applyAuthGating();
+    } catch (err) {
+      if (err.message.includes('timeout')) {
+        throw new Error('Request timeout. Please check your connection.');
+      }
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        throw new Error('Network error. Please check your connection.');
+      }
+      // Re-throw the original error if it's already user-friendly
+      throw err;
+    }
+  }
+
+  async function register(email, password) {
+    // Input validation
+    if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+      throw new Error('Email and password are required');
+    }
+
+    if (email.length > 254 || password.length > 128) {
+      throw new Error('Input data too long');
+    }
+
+    if (email.length < 3 || password.length < 8) {
+      throw new Error('Input data too short');
+    }
+
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+
+      if (!res.ok) {
+        let errorMessage = "Registration failed";
+        try {
+          const err = await res.json();
+          errorMessage = err.message || errorMessage;
+        } catch {
+          // If we can't parse the error response, use status text
+          errorMessage = res.statusText || errorMessage;
+        }
+
+        // Handle specific HTTP status codes
+        if (res.status === 409) {
+          throw new Error('An account with this email already exists');
+        } else if (res.status === 429) {
+          throw new Error('Too many registration attempts. Please wait before trying again.');
+        } else if (res.status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      if (err.message.includes('timeout')) {
+        throw new Error('Request timeout. Please check your connection.');
+      }
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        throw new Error('Network error. Please check your connection.');
+      }
+      // Re-throw the original error if it's already user-friendly
+      throw err;
+    }
+  }
+
+  async function logout() {
+    try {
+      await fetchWithTimeout(`${API_BASE_URL}/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+
+    clearAccessToken();
+    renderAuthArea();
+    applyAuthGating();
+    // Force reload to clear any private state
+    window.location.reload();
+  }
+
+  async function restoreSession() {
+    // If we have a stored refresh token, try to use it
+    if (localStorage.getItem("x_refresh_token")) {
+      try {
+        await refreshAccessToken();
+      } catch (err) {
+        console.log("No existing session restored");
+      }
+    }
+  }
+
+  function renderAuthArea() {
+    const container = document.getElementById("auth-area");
     if (!container) return;
-    const session = await getSession();
-    const userEmail = session?.user?.email;
 
-    if (!userEmail) {
-      container.innerHTML = '<a class="btn btn-outline" href="login.html">Sign in</a>';
+    if (!isAuthenticated()) {
+      container.innerHTML =
+        '<a class="btn btn-outline" href="login.html">Sign in</a>';
       return;
     }
 
-    const avatar = getAvatarUrl(session);
     container.innerHTML = `
       <div class="user-menu">
-        <button class="user-button" id="user-button" aria-haspopup="true" aria-expanded="false" title="${escapeHtml(userEmail)}">
-          <img class="user-avatar" src="${avatar}" alt="User avatar" />
-          <span class="chev" aria-hidden="true">▾</span>
+        <button class="user-button" id="user-button">
+          <span class="user-avatar">U</span>
+          <span class="chev">▾</span>
         </button>
-        <div class="user-dropdown" id="user-dropdown" role="menu" hidden>
-          <button class="dropdown-item" id="sign-out-btn" role="menuitem">Sign out</button>
+        <div class="user-dropdown" id="user-dropdown" hidden>
+          <button class="dropdown-item" id="sign-out-btn">Sign out</button>
         </div>
-      </div>`;
+      </div>
+    `;
 
-    const btn = document.getElementById('user-button');
-    const dd = document.getElementById('user-dropdown');
-    const signOutBtn = document.getElementById('sign-out-btn');
+    const btn = document.getElementById("user-button");
+    const dd = document.getElementById("user-dropdown");
+    const signOutBtn = document.getElementById("sign-out-btn");
 
-    if (btn && dd) {
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        const isHidden = dd.hasAttribute('hidden');
-        if (isHidden) {
-          dd.removeAttribute('hidden');
-          btn.setAttribute('aria-expanded', 'true');
-        } else {
-          dd.setAttribute('hidden', '');
-          btn.setAttribute('aria-expanded', 'false');
-        }
-      });
-      document.addEventListener('click', (e) => {
-        if (!dd || dd.hasAttribute('hidden')) return;
-        const within = e.target === btn || btn.contains(e.target) || dd.contains(e.target);
-        if (!within) {
-          dd.setAttribute('hidden', '');
-          btn.setAttribute('aria-expanded', 'false');
-        }
-      });
-    }
+    btn.addEventListener("click", () => {
+      dd.toggleAttribute("hidden");
+    });
 
-    if (signOutBtn) {
-      signOutBtn.addEventListener('click', async () => {
-        const c = ensureClient();
-        if (!c) return;
-        try {
-          await c.auth.signOut();
-        } finally {
-          // Immediately re-render UI and gating without requiring a manual refresh
-          await renderAuthArea();
-          await applyAuthGating();
-        }
-      });
-    }
+    signOutBtn.addEventListener("click", logout);
   }
 
-  function escapeHtml(s){
-    return (s||'').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c]));
-  }
+  function applyAuthGating() {
+    const authed = isAuthenticated();
 
-  async function handleAuthState(){
-    const c = ensureClient();
-    if (!c) return;
-    // Render immediately
-    await renderAuthArea();
-    // React to auth changes
-    c.auth.onAuthStateChange(async (_event, _session) => {
-      await renderAuthArea();
-      // Optionally gate content blocks marked data-requires-auth
-      applyAuthGating();
-      // Notify other modules
-      try { window.dispatchEvent(new CustomEvent('xaytheon:authchange')); } catch {}
-    });
-    applyAuthGating();
-    // Re-apply once after a short delay (covers delayed session hydration on first load)
-    setTimeout(applyAuthGating, 300);
-  }
+    document
+      .querySelectorAll("[data-requires-auth]")
+      .forEach((el) => (el.style.display = authed ? "" : "none"));
 
-  async function applyAuthGating(){
-    const session = await getSession();
-    const authed = !!session;
-    document.querySelectorAll('[data-requires-auth]').forEach((el) => {
-      el.style.display = authed ? '' : 'none';
-    });
-    document.querySelectorAll('[data-requires-guest]').forEach((el) => {
-      el.style.display = authed ? 'none' : '';
-    });
+    document
+      .querySelectorAll("[data-requires-guest]")
+      .forEach((el) => (el.style.display = authed ? "none" : ""));
   }
 
   // Login with email + password
@@ -179,75 +405,93 @@
 
   window.XAYTHEON_AUTH = { ensureClient, getSession, handleAuthState, sendMagicLink, login, signup };
 
-  // Initialize on DOM ready
-  window.addEventListener('DOMContentLoaded', handleAuthState);
-})();
-// Supabase Auth bootstrap (client-side, works on GitHub Pages)
-(() => {
-  const SUPABASE_URL = 'https://gqwohbqudbxahlssuohr.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdxd29oYnF1ZGJ4YWhsc3N1b2hyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA1MDM0OTgsImV4cCI6MjA3NjA3OTQ5OH0.KLkjEHdMM5xUpO-bLRhLGYF_x6XShzjso4Evwlxza2I';
-
-  if (!window.supabase || !window.supabase.createClient) {
-    console.error('Supabase SDK not loaded. Ensure @supabase/supabase-js is included before auth.js');
-    return;
-  }
-
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
+  window.addEventListener("DOMContentLoaded", async () => {
+    enforceHttps();
+    await restoreSession();
+    renderAuthArea();
+    applyAuthGating();
   });
 
-  // Expose globally for optional use elsewhere
-  window.sb = sb;
+  window.addEventListener("beforeunload", () => {
+    // Tokens cleared automatically on page close
+  });
 
-  function qs(id) { return document.getElementById(id); }
+  // Ensure XAYTHEON_AUTH exists
+window.XAYTHEON_AUTH = window.XAYTHEON_AUTH || {};
 
-  async function refreshAuthUI() {
-    try {
-      const { data: { user } } = await sb.auth.getUser();
-
-      const signin = qs('auth-signin');
-      const signout = qs('auth-signout');
-      const userEl = qs('auth-user');
-
-      if (user) {
-        if (signin) signin.style.display = 'none';
-        if (signout) signout.style.display = '';
-        if (userEl) { userEl.textContent = user.email || user.user_metadata?.name || 'Signed in'; userEl.style.display = ''; }
-        toggleGated(true);
-      } else {
-        if (signin) signin.style.display = '';
-        if (signout) signout.style.display = 'none';
-        if (userEl) { userEl.textContent = ''; userEl.style.display = 'none'; }
-        toggleGated(false);
-      }
-    } catch (e) {
-      console.warn('Auth UI refresh error:', e);
-    }
-  }
-
-  function toggleGated(authed) {
-    document.querySelectorAll('[data-requires-auth]')
-      .forEach(el => { el.style.display = authed ? '' : 'none'; });
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    // Wire sign out
-    const signout = qs('auth-signout');
-    if (signout) {
-      signout.addEventListener('click', async () => {
-        try { await sb.auth.signOut(); } catch {}
-        await refreshAuthUI();
-      });
-    }
-
-    // Initial UI sync and listen to changes
-    refreshAuthUI();
-    sb.auth.onAuthStateChange((_event, _session) => {
-      refreshAuthUI();
+/**
+ * Request password reset (forgot password)
+ * @param {string} email - User's email address
+ */
+window.XAYTHEON_AUTH.forgotPassword = async function(email) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/forgot-password`, {  
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
     });
-  });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to send reset email");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Reset password using token
+ * @param {string} token - Reset token from email
+ * @param {string} newPassword - New password
+ */
+window.XAYTHEON_AUTH.resetPassword = async function(token, newPassword) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, newPassword }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to reset password");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Reset password error:", error);
+    throw error;
+  }
+};
+
+/**
+ * Validate reset token
+ * @param {string} token - Reset token to validate
+ */
+window.XAYTHEON_AUTH.validateResetToken = async function(token) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/validate-reset-token?token=${encodeURIComponent(token)}`, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.valid) {
+      throw new Error(data.message || "Invalid token");
+    }
+
+    return data;
+  } catch (error) {
+    console.error("Validate token error:", error);
+    throw error;
+  }
+};
+
 })();
