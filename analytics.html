@@ -1,21 +1,24 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Track your GitHub growth over time with advanced analytics, interactive charts, and historical data visualization." />
+  <meta name="description"
+    content="Track your GitHub growth over time with advanced analytics, interactive charts, and historical data visualization." />
   <title>Analytics Dashboard — XAYTHEON</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="analytics.css" />
-  
+
   <!-- Chart.js for data visualization -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  
+
   <!-- Supabase SDK & auth bootstrap -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.4/dist/umd/supabase.min.js"></script>
   <script defer src="auth.js"></script>
 </head>
+
 <body class="eightgon-page">
   <div class="page-wrapper">
 
@@ -27,21 +30,23 @@
         <ul class="nav-menu">
           <li><a class="nav-link" href="index.html#home">Home</a></li>
           <li><a class="nav-link" href="github.html">GitHub Dashboard</a></li>
+          <li><a class="nav-link" href="watchlist.html">Watchlist</a></li>
           <li><a class="nav-link" href="community.html">Community Highlights</a></li>
           <li><a class="nav-link" href="explore.html">Explore by Topic</a></li>
           <li><a class="nav-link" href="contributions.html">Contributions</a></li>
           <li>
             <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode">
-              <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="5"/>
-                <line x1="12" y1="1" x2="12" y2="3"/>
-                <line x1="12" y1="21" x2="12" y2="23"/>
-                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-                <line x1="1" y1="12" x2="3" y2="12"/>
-                <line x1="21" y1="12" x2="23" y2="12"/>
-                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+              <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="5" />
+                <line x1="12" y1="1" x2="12" y2="3" />
+                <line x1="12" y1="21" x2="12" y2="23" />
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                <line x1="1" y1="12" x2="3" y2="12" />
+                <line x1="21" y1="12" x2="23" y2="12" />
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             </button>
           </li>
@@ -53,7 +58,7 @@
     <main>
       <section id="analytics" class="analytics-section">
         <div class="container">
-          
+
           <!-- Header -->
           <div class="analytics-header">
             <div>
@@ -85,7 +90,8 @@
             <div class="warning-icon">⚠️</div>
             <div>
               <h3>Authentication Required</h3>
-              <p>Please <a href="login.html">sign in</a> to access your analytics dashboard and track your GitHub growth over time.</p>
+              <p>Please <a href="login.html">sign in</a> to access your analytics dashboard and track your GitHub growth
+                over time.</p>
             </div>
           </div>
 
@@ -124,7 +130,7 @@
                 <div class="metric-change" id="metric-stars-change">—</div>
               </div>
             </div>
-            
+
             <div class="metric-card">
               <div class="metric-icon">👥</div>
               <div class="metric-content">
@@ -133,7 +139,7 @@
                 <div class="metric-change" id="metric-followers-change">—</div>
               </div>
             </div>
-            
+
             <div class="metric-card">
               <div class="metric-icon">📦</div>
               <div class="metric-content">
@@ -142,7 +148,7 @@
                 <div class="metric-change" id="metric-repos-change">—</div>
               </div>
             </div>
-            
+
             <div class="metric-card">
               <div class="metric-icon">💻</div>
               <div class="metric-content">
@@ -155,7 +161,7 @@
 
           <!-- Charts Grid -->
           <div class="charts-grid">
-            
+
             <!-- Stars Growth Chart -->
             <div class="card chart-card">
               <div class="card-header">
@@ -325,4 +331,5 @@
   <!-- Analytics-specific script -->
   <script src="analytics.js"></script>
 </body>
+
 </html>
