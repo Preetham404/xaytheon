@@ -695,7 +695,7 @@ function addInteractiveEffects() {
 // Initialize when page loads
 document.addEventListener("DOMContentLoaded", () => {
   // Initialize theme first before anything else
-  initTheme();
+  // initTheme();
 
   // If the 3D canvas exists, we're on the home page; otherwise, dashboard-only page.
   const hasThree = !!document.getElementById("three-canvas");
@@ -708,8 +708,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initGithubDashboard();
   // Initialize the mini 3D viewer on github.html if present
   initMiniViewer();
-  // Delay recommendations to allow auth setup
-  setTimeout(initRecommendations, 1500);
   // Delay recommendations to allow auth setup
   setTimeout(initRecommendations, 1500);
 
@@ -727,10 +725,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+
 // ===================== DARK MODE / THEME MANAGEMENT =====================
 function initTheme() {
   const savedTheme = localStorage.getItem("xaytheon:theme");
-
   if (savedTheme) {
     setTheme(savedTheme);
   } else {
