@@ -21,6 +21,7 @@ const workflowRoutes = require("./routes/workflow.routes");
 const dependencyRoutes = require("./routes/dependency.routes");
 const aiRoutes = require("./routes/ai.routes");
 const riskRoutes = require("./routes/risk.routes");
+const healthRoutes = require("./routes/health.routes");
 
 const app = express();
 
@@ -136,6 +137,7 @@ app.use("/api/workflow", workflowRoutes);
 app.use("/api/dependency", dependencyRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/risk", riskRoutes);
+app.use("/api/health", healthRoutes);
 
 app.use((err, req, res, next) => {
   console.error("Error:", err);
