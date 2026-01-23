@@ -23,6 +23,7 @@
     <script defer src="i18n.js"></script>
     <script defer src="pwa.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="boilerplate/scrollTop.css">
 </head>
 
 <body>
@@ -200,6 +201,25 @@
         })
         .catch(error => console.error('Error loading navbar:', error));
 </script>
+<script src="boilerplate/scrollTop.js"></script>
+  <!-- Rocket Scroll to Top Button -->
+    <div id="rocketButton" class="rocket-button">
+        <div class="circle-ring"></div>                                                               
+        <div class="inner-circle"></div>
+
+        <button class="rocket-btn">
+            <div class="smoke-trail" id="smokeTrail"></div>
+            <div class="explosion" id="explosion"></div>
+
+            <div class="rocket-container">
+                <div class="rocket">
+                    <div class="rocket-window"></div>
+                </div>
+                <div class="fire-effect"></div>
+            </div>
+        </button>
+    </div>
+
 
 </body>
 
