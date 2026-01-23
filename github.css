@@ -1,3 +1,35 @@
+
+/* Most Sophisticated & Luxury */
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Marcellus&display=swap');
+
+body {
+  font-family: 'Cormorant Garamond', serif;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+}
+
+h1, h2, h3, h4, .hero-title, .section-title {
+  font-family: 'Marcellus', serif;
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Extra luxury touch */
+.hero-title {
+  font-size: clamp(3rem, 6vw, 5rem);
+  letter-spacing: 0.1em;
+  font-weight: 400;
+}
+
+.profile-name {
+  font-family: 'Marcellus', serif;
+  font-size: 2.5rem;
+  letter-spacing: 0.08em;
+}
+
 /* ===================================
    GITHUB DASHBOARD - PREMIUM STYLES
    BLACK & WHITE THEME
@@ -97,10 +129,7 @@
 .github-container {
   max-width: 1400px;
   margin: 0 auto;
-    padding: var(--space-3xl) var(--space-lg);
-#github.github-section {
-    margin-top: var(--space-5xl);
-    padding: var(--space-4xl) 0;
+  padding: var(--space-3xl) var(--space-lg);
 }
 
 /* ===================================
@@ -108,9 +137,11 @@
    =================================== */
 .hero-section {
   text-align: center;
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
-    padding: var(--space-3xl) 0;
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+  padding: var(--space-3xl) 0;
+}
+
 .hero-title {
   font-size: clamp(2.5rem, 5vw, 4rem);
   font-weight: 900;
@@ -140,8 +171,12 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-2xl);
   padding: var(--space-xl);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+  transition: all var(--transition-base);
+}
+
+.search-card:hover {
   border-color: var(--border-hover);
   box-shadow: var(--shadow-xl);
   transform: translateY(-2px);
@@ -271,11 +306,12 @@
 }
 
 .dashboard-section {
-    margin-bottom: var(--space-5xl);
-    margin-top: var(--space-5xl);
-    padding: var(--space-3xl) 0;
-    border-top: 2px solid var(--border-primary);
-    padding-top: var(--space-4xl);
+  margin-bottom: var(--space-5xl);
+  margin-top: var(--space-5xl);
+  padding: var(--space-3xl) 0;
+  border-top: 2px solid var(--border-primary);
+  padding-top: var(--space-4xl);
+}
 
 .section-header {
   margin-bottom: var(--space-xl);
@@ -303,13 +339,17 @@
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: var(--space-lg);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+}
+
+.profile-main-card {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-2xl);
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   transition: all var(--transition-base);
+  background: var(--card-gradient);
 }
 
 .profile-main-card:hover {
@@ -580,8 +620,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-lg);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+}
+
+.stat-card {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
@@ -589,6 +632,7 @@
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+  background: var(--card-gradient);
 }
 
 .stat-card::before {
@@ -690,8 +734,12 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+}
+
+.card-title {
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: var(--space-lg);
@@ -746,8 +794,12 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
-    margin-top: var(--space-3xl);
-    margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+}
+
+.top-repos-list {
+  display: flex;
   flex-direction: column;
   gap: var(--space-md);
 }
@@ -821,8 +873,11 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: var(--space-lg);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+}
+
+.activity-stat-card {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
@@ -830,6 +885,9 @@
   transition: all var(--transition-base);
   position: relative;
   overflow: hidden;
+  background: var(--card-gradient);
+  display: flex;
+  flex-direction: column;
 }
 
 .activity-stat-card::before {
@@ -855,11 +913,6 @@
 }
 
 /* Activity Card Header with Icon */
-.activity-stat-card {
-  display: flex;
-  flex-direction: column;
-}
-
 .activity-icon {
   width: 48px;
   height: 48px;
@@ -871,7 +924,6 @@
   margin-bottom: var(--space-lg);
 }
 
-/* Remove emoji styling, use SVG icons instead */
 .activity-icon.streak {
   background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
 }
@@ -936,8 +988,13 @@
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
   box-shadow: var(--shadow-md);
-    margin-top: var(--space-3xl);
-    margin-bottom: var(--space-5xl);
+  margin-top: var(--space-3xl);
+  margin-bottom: var(--space-5xl);
+}
+
+.chart-container {
+  width: 100%;
+  height: 300px;
 }
 
 .activity-chart {
@@ -946,8 +1003,7 @@
 }
 
 /* ===================================
-   CONTRIBUTION HEATMAP - FIXED & SCOPED
-   No Global Spacing Impact
+   CONTRIBUTION HEATMAP
    =================================== */
 
 .contribution-heatmap-card {
@@ -955,9 +1011,11 @@
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
-    margin-bottom: var(--space-4xl);
-    margin-top: var(--space-3xl);
-.contribution-heatmap-card .heatmap-header {
+  margin-bottom: var(--space-4xl);
+  margin-top: var(--space-3xl);
+}
+
+.heatmap-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -966,75 +1024,75 @@
   gap: var(--space-md);
 }
 
-.contribution-heatmap-card .card-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0;
-}
-
-/* Legend */
-.contribution-heatmap-card .heatmap-legend {
+.heatmap-legend {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.contribution-heatmap-card .legend-label {
+.legend-label {
   font-size: 11px;
   color: var(--text-tertiary);
   margin: 0 4px;
 }
 
-.contribution-heatmap-card .legend-box {
+.legend-box {
   width: 10px;
   height: 10px;
   border-radius: 2px;
 }
 
 /* Dark Theme Colors */
-.contribution-heatmap-card .level-0 {
+.level-0 {
   background: #161b22;
 }
-.contribution-heatmap-card .level-1 {
+
+.level-1 {
   background: #0e4429;
 }
-.contribution-heatmap-card .level-2 {
+
+.level-2 {
   background: #006d32;
 }
-.contribution-heatmap-card .level-3 {
+
+.level-3 {
   background: #26a641;
 }
-.contribution-heatmap-card .level-4 {
+
+.level-4 {
   background: #39d353;
 }
 
 /* Light Theme */
-[data-theme="light"] .contribution-heatmap-card .level-0 {
+[data-theme="light"] .level-0 {
   background: #ebedf0;
 }
-[data-theme="light"] .contribution-heatmap-card .level-1 {
+
+[data-theme="light"] .level-1 {
   background: #9be9a8;
 }
-[data-theme="light"] .contribution-heatmap-card .level-2 {
+
+[data-theme="light"] .level-2 {
   background: #40c463;
 }
-[data-theme="light"] .contribution-heatmap-card .level-3 {
+
+[data-theme="light"] .level-3 {
   background: #30a14e;
 }
-[data-theme="light"] .contribution-heatmap-card .level-4 {
+
+[data-theme="light"] .level-4 {
   background: #216e39;
 }
 
 /* Heatmap Container */
-.contribution-heatmap-card .heatmap-container {
+.heatmap-container {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
   padding: 12px 0;
 }
 
-.contribution-heatmap-card .heatmap-wrapper {
+.heatmap-wrapper {
   position: relative;
   display: inline-block;
   min-width: 100%;
@@ -1043,7 +1101,7 @@
 }
 
 /* Month Labels */
-.contribution-heatmap-card .month-labels {
+.month-labels {
   position: absolute;
   top: 0;
   left: 40px;
@@ -1051,13 +1109,13 @@
   color: var(--text-tertiary);
 }
 
-.contribution-heatmap-card .month-label {
+.month-label {
   position: absolute;
   white-space: nowrap;
 }
 
 /* Weekday Labels */
-.contribution-heatmap-card .weekday-labels {
+.weekday-labels {
   position: absolute;
   left: 0;
   top: 18px;
@@ -1070,30 +1128,30 @@
   color: var(--text-tertiary);
 }
 
-.contribution-heatmap-card .weekday-label {
+.weekday-label {
   height: 13px;
   line-height: 13px;
 }
 
 /* Grid */
-.contribution-heatmap-card .grid-container {
+.grid-container {
   padding-left: 40px;
   display: inline-block;
 }
 
-.contribution-heatmap-card .contribution-grid {
+.contribution-grid {
   display: inline-flex;
   gap: 4px;
 }
 
-.contribution-heatmap-card .contribution-week {
+.contribution-week {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 /* Cells */
-.contribution-heatmap-card .contribution-day {
+.contribution-day {
   width: 13px;
   height: 13px;
   border-radius: 2px;
@@ -1101,22 +1159,22 @@
   transition: transform 0.15s ease;
 }
 
-.contribution-heatmap-card .contribution-day:hover {
+.contribution-day:hover {
   transform: scale(1.15);
   outline: 2px solid rgba(255, 255, 255, 0.4);
 }
 
-[data-theme="light"] .contribution-heatmap-card .contribution-day:hover {
+[data-theme="light"] .contribution-day:hover {
   outline: 2px solid rgba(0, 0, 0, 0.3);
 }
 
-.contribution-heatmap-card .contribution-day.empty {
+.contribution-day.empty {
   background: transparent !important;
   cursor: default;
 }
 
 /* Tooltip */
-.contribution-heatmap-card .heatmap-tooltip {
+.heatmap-tooltip {
   position: fixed;
   padding: 10px 12px;
   border-radius: 6px;
@@ -1126,35 +1184,34 @@
   white-space: nowrap;
 }
 
-[data-theme="dark"] .contribution-heatmap-card .heatmap-tooltip {
+[data-theme="dark"] .heatmap-tooltip {
   background: #1c2128;
   border: 1px solid #30363d;
 }
 
-[data-theme="light"] .contribution-heatmap-card .heatmap-tooltip {
+[data-theme="light"] .heatmap-tooltip {
   background: #ffffff;
   border: 1px solid #d0d7de;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .contribution-heatmap-card .contribution-day {
+  .contribution-day {
     width: 11px;
     height: 11px;
   }
 
-  .contribution-heatmap-card .grid-container {
+  .grid-container {
     padding-left: 36px;
   }
 
-  .contribution-heatmap-card .month-labels {
+  .month-labels {
     left: 36px;
   }
 }
 
 /* ===================================
-   REPO SUB-TEXT FONT FIX (SAFE)
-   Only affects repository sub text
+   REPO SUB-TEXT FONT FIX
    =================================== */
 
 .repo-description {
@@ -1187,4 +1244,56 @@
 .repo-stat {
   font-family: inherit;
   letter-spacing: 0.01em;
+}
+
+/* ===================================
+   RESPONSIVE DESIGN
+   =================================== */
+@media (max-width: 1024px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .profile-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  .profile-avatar-wrapper {
+    margin-top: -60px;
+  }
+}
+
+@media (max-width: 768px) {
+  .github-container {
+    padding: var(--space-xl) var(--space-md);
+  }
+  
+  .hero-section {
+    margin-top: var(--space-2xl);
+    margin-bottom: var(--space-3xl);
+    padding: var(--space-2xl) 0;
+  }
+  
+  .search-actions {
+    flex-direction: column;
+  }
+  
+  .repo-stats-grid,
+  .activity-overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .repo-stats-grid,
+  .activity-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .profile-meta {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
 }
