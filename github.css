@@ -125,12 +125,12 @@ h1, h2, h3, h4, .hero-title, .section-title {
   background: var(--bg-primary);
   padding: var(--space-3xl) 0;
 }
-
 .github-container {
   max-width: 1400px;
   margin: 0 auto;
   padding: var(--space-3xl) var(--space-lg);
 }
+
 
 /* ===================================
    HERO SECTION
@@ -1014,8 +1014,8 @@ h1, h2, h3, h4, .hero-title, .section-title {
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-xl);
   padding: var(--space-xl);
-  margin-bottom: var(--space-4xl);
-  margin-top: var(--space-3xl);
+    margin-bottom: var(--space-4xl);
+    margin-top: var(--space-3xl);
 }
 
 .heatmap-header {
