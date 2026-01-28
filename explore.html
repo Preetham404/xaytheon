@@ -7,10 +7,10 @@
   <title>Explore by Topic — XAYTHEON</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css" />
-   <link rel="stylesheet" href="style.css?v=3">
-   <link rel="stylesheet" href="favorites.css">
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="stylesheet" href="favorites.css">
 
-   <script src="theme.js"></script>
+  <script src="theme.js"></script>
   <!-- Supabase SDK & Auth for navbar -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.44.4/dist/umd/supabase.min.js"></script>
   <script defer src="auth.js"></script>
@@ -27,67 +27,84 @@
 
     <section class="github-section">
       <div class="container">
-        <h2 class="section-title" style="font-family:'Eightgon',sans-serif;" data-i18n="nav.explore">Explore by Topic
-        </h2>
-
-        <form id="explore-form" class="github-form" autocomplete="off" style="margin-bottom: 16px;">
-          <div class="field-group" style="grid-column: span 4;">
-            <label for="ex-base-topic">Base Topic</label>
-            <input id="ex-base-topic" type="text" placeholder="e.g. threejs" value="threejs" />
-          </div>
-          <div class="field-group" style="grid-column: span 4;">
-            <label for="ex-language">Language</label>
-            <select id="ex-language">
-              <option value="">Any</option>
-              <option>JavaScript</option>
-              <option>TypeScript</option>
-              <option>Python</option>
-              <option>Go</option>
-              <option>Rust</option>
-              <option>Java</option>
-              <option>C#</option>
-              <option>C++</option>
-            </select>
-          </div>
-          <div class="field-group" style="grid-column: span 4;">
-            <label for="ex-limit">Repos to sample</label>
-            <input id="ex-limit" type="text" inputmode="numeric" value="50" />
-
-          </div>
-          <button class="btn btn-primary" type="submit" data-i18n="common.search">Explore</button>
-          <button class="btn btn-outline" type="button" id="ex-clear" data-i18n="common.cancel">Clear</button>
-          <div id="ex-status" class="github-status" aria-live="polite"></div>
-          <div id="ex-cache-info" class="github-status" aria-live="polite"
-            style="margin-top: 8px; font-size: 0.9em; color: #6b7280;"></div>
-        </form>
-
-        <div class="view-toggle" style="display:flex; gap:8px; margin-bottom:12px;">
-          <button class="btn " id="view-graph-btn">Graph View</button>
-          <button class="btn " id="view-list-btn">List View</button>
+        <!-- Hero Section with Title and Description -->
+        <div class="topic-explore-hero">
+          <h2 data-i18n="nav.explore">Explore by Topic</h2>
+          <p>Discover GitHub repositories organized by topics. Visualize connections between repositories and topics through an interactive graph, or browse a detailed list view.</p>
         </div>
 
-        <div class="card" style="grid-column: 1 / -1;">
+        <!-- Filter and Action Bar -->
+        <div class="filter-action-bar">
+          <form id="explore-form" class="github-form" autocomplete="off">
+            <div class="field-group">
+              <label for="ex-base-topic">Base Topic</label>
+              <input id="ex-base-topic" type="text" placeholder="e.g. threejs, react, python" value="threejs" />
+              <span class="helper-text">Primary topic to explore</span>
+            </div>
+            <div class="field-group">
+              <label for="ex-language">Language</label>
+              <select id="ex-language">
+                <option value="">Any</option>
+                <option>JavaScript</option>
+                <option>TypeScript</option>
+                <option>Python</option>
+                <option>Go</option>
+                <option>Rust</option>
+                <option>Java</option>
+                <option>C#</option>
+                <option>C++</option>
+              </select>
+              <span class="helper-text">Filter by programming language</span>
+            </div>
+            <div class="field-group">
+              <label for="ex-limit">Repos to Sample</label>
+              <input id="ex-limit" type="text" inputmode="numeric" value="50" />
+              <span class="helper-text">Max repositories to load (1-100)</span>
+            </div>
+          </form>
+
+          <div class="action-row">
+            <button class="btn btn-primary" type="submit" form="explore-form" data-i18n="common.search">Explore</button>
+            <button class="btn btn-outline" type="button" id="ex-clear" data-i18n="common.cancel">Clear</button>
+            <div class="status-cache-row">
+              <div id="ex-status" class="github-status" aria-live="polite"></div>
+              <div id="ex-cache-info" class="github-status" aria-live="polite"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="view-toggle">
+          <button class="btn active" id="view-graph-btn">Graph View</button>
+          <button class="btn" id="view-list-btn">List View</button>
+        </div>
+
+        <!-- Visualization Card -->
+        <div class="visualization-card">
           <div class="card-header">
-            <h3>Topic Map</h3>
+            <h3>Topic Map Visualization</h3>
           </div>
           <div class="card-body">
+            <!-- Graph View -->
             <div id="graph-view">
-              <div id="graph-wrap"
-                style="width:100%; height:560px; position:relative; border:1px solid var(--border-color); border-radius:10px; overflow:hidden;">
+              <div id="graph-wrap">
                 <svg id="graph" width="100%" height="100%"></svg>
-                <div id="graph-legend"
-                  style="position:absolute; right:12px; top:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:8px; padding:8px 10px; font-size:12px;">
-                  <div><span
-                      style="display:inline-block;width:10px;height:10px;background:#0ea5e9;border-radius:50%;margin-right:6px;"></span>Topic
+                <div id="graph-legend">
+                  <div>
+                    <span style="background:#0ea5e9;"></span>Topic
                   </div>
-                  <div><span
-                      style="display:inline-block;width:10px;height:10px;background:var(--text-primary);border-radius:50%;margin-right:6px;"></span>Repo
+                  <div>
+                    <span style="background:#e0e0e0;"></span>Repo
                   </div>
                 </div>
+                <!-- Tooltip for hover interactions -->
+                <div class="graph-tooltip" id="graph-tooltip"></div>
               </div>
             </div>
+
+            <!-- List View -->
             <div id="list-view" style="display:none;">
-              <table class="repo-table" style="width:100%; border-collapse:collapse;">
+              <table class="repo-table">
                 <thead>
                   <tr>
                     <th align="left">Repository</th>
@@ -99,12 +116,12 @@
                 <tbody id="repo-list"></tbody>
               </table>
             </div>
-
           </div>
         </div>
+      </div>
     </section>
 
-  <div id="footer-placeholder"></div>
+    <div id="footer-placeholder"></div>
   </div>
 
   <script src="explore.js"></script>
@@ -114,6 +131,46 @@
     
 </body>
 
+  <script>
+    // Enhanced view toggle with active state management
+    const graphBtn = document.getElementById('view-graph-btn');
+    const listBtn = document.getElementById('view-list-btn');
+    const graphView = document.getElementById('graph-view');
+    const listView = document.getElementById('list-view');
+
+    graphBtn.addEventListener('click', () => {
+      graphView.style.display = 'block';
+      listView.style.display = 'none';
+      graphBtn.classList.add('active');
+      listBtn.classList.remove('active');
+    });
+
+    listBtn.addEventListener('click', () => {
+      graphView.style.display = 'none';
+      listView.style.display = 'block';
+      listBtn.classList.add('active');
+      graphBtn.classList.remove('active');
+    });
+
+    // Enhanced D3 graph tooltip interaction (add to your explore.js or here)
+    // This provides hover tooltips for better node interaction
+    const tooltip = d3.select('#graph-tooltip');
+
+    // Example node interaction - integrate with your D3 graph rendering
+    function enableNodeTooltips(nodeSelection) {
+      nodeSelection
+        .on('mouseover', function(event, d) {
+          tooltip
+            .html(`<strong>${d.name || d.id}</strong><br/>${d.type === 'topic' ? 'Topic' : 'Repository'}<br/>${d.stars ? `⭐ ${d.stars}` : ''}`)
+            .style('left', (event.pageX + 15) + 'px')
+            .style('top', (event.pageY - 28) + 'px')
+            .classed('visible', true);
+        })
+        .on('mouseout', function() {
+          tooltip.classed('visible', false);
+        });
+    }
+  </script>
+</body>
+
 </html>
-
-
